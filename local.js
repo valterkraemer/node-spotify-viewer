@@ -10,30 +10,97 @@ var headers = {
   'Origin': 'https://open.spotify.com'
 };
 
+var csrf = '';
+var oauth = '';
+
+ws.on('message', function(message) {
+
+  var data = {};
+
+  try {
+    data = JSON.parse(message);
+  } catch (e) {
+    console.error('JSON error', message);
+  }
+
+  console.log('data', data);
+
+  switch (data.type) {
+    case 'play':
+      return play();
+    case 'pause':
+      return pause();
+  }
+});
+
 function getCsrfToken() {
 
-  var params = {
-    'url': 'https://randomtext.spotilocal.com:4370/simplecsrf/token.json',
-    'headers': headers,
-    'rejectUnauthorized' : false
-  };
+  var url = 'https://randomtext.spotilocal.com:4370/simplecsrf/token.json';
 
-  return new Promise(function(resolve, reject) {
-    request(params, function (err, req, body) {
-      if (err) {
-        return reject(err);
-      }
-      var parsedBody = JSON.parse(body);
-      return resolve(parsedBody.token);
-    });
+  return spotilocalReq(url)
+  .then(function(data) {
+    return data.token;
   });
 }
 
 function getOauthToken() {
 
+  var url = 'http://open.spotify.com/token';
+
+  return spotilocalReq(url)
+  .then(function(data) {
+    return data.t;
+  });
+}
+
+function connect(values) {
+  csrf = values[0];
+  oauth = values[1];
+
+  var getOnceUrl = 'https://randomtext.spotilocal.com:4370/remote/status.json' + 
+  '?oauth=' + oauth + '&csrf=' + csrf;
+
+  var watchUrl = getOnceUrl + '&returnon=play%2Cpause&returnafter=60';
+
+  function getStatus() {
+    return spotilocalReq(watchUrl)
+    .then(sendData)
+    .then(getStatus);
+  }
+
+  spotilocalReq(getOnceUrl)
+  .then(sendData)
+  .then(getStatus)
+  .catch(function(err) {
+    console.error('err', err);
+  });
+}
+
+function sendData(data) {
+
+  var socketData = JSON.stringify({
+    type: 'status',
+    trackId: data.track.track_resource.uri.split('spotify:track:')[1],
+    playing: data.playing
+  });
+
+  return new Promise(function(resolve, reject) {
+    ws.send(socketData, function(err) {
+      if (err) {
+        return reject(err);
+      }
+      resolve();
+    });
+  });
+  
+}
+
+function spotilocalReq(url, next) {
   var params = {
-    'url': 'http://open.spotify.com/token',
-    'headers': headers,
+    'url': url,
+    'headers': {
+      'Origin': 'https://open.spotify.com'
+    },
     'rejectUnauthorized' : false
   };
 
@@ -42,56 +109,26 @@ function getOauthToken() {
       if (err) {
         return reject(err);
       }
-      var parsedBody = JSON.parse(body);
-      return resolve(parsedBody.t);
+      return resolve(JSON.parse(body));
     });
   });
 }
 
-function connect(values) {
-  var csrf = values[0];
-  var oauth = values[1];
-
-  var url = 'https://randomtext.spotilocal.com:4370/remote/status.json' + 
+function pause() {
+  var url = 'https://randomtext.spotilocal.com:4370/remote/pause.json' + 
   '?oauth=' + oauth + '&csrf=' + csrf +
-  '&returnon=play%2Cpause&returnafter=60';
+  '&pause=true';
 
-  var params = {
-    'url': url,
-    'headers': headers,
-    'rejectUnauthorized' : false
-  };
-
-  function getTrackId() {
-    request(params, function (err, req, body) {
-      if (err) {
-        return reject(err);
-      }
-      var parsedBody = JSON.parse(body);
-      var trackId = parsedBody.track.track_resource.uri.split('spotify:track:')[1];
-      sendTrackId(trackId);
-      getTrackId();
-    });
-  }
-
-  getTrackId();
+  spotilocalReq(url);
 }
 
-var trackId = '';
+function play() {
+  var url = 'https://randomtext.spotilocal.com:4370/remote/pause.json' + 
+  '?oauth=' + oauth + '&csrf=' + csrf +
+  '&pause=false';
 
-function sendTrackId(newTrackId) {
-  console.log('newTrackId', newTrackId);
-
-  if (newTrackId === trackId) {
-    return;
-  }
-
-  trackId = newTrackId;
-
-  ws.send('post:' + trackId);
+  spotilocalReq(url);
 }
-
-
 
 Promise.all([
   getCsrfToken(),

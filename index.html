@@ -26,6 +26,10 @@
     h2 {
       font-size: 5vw;
     }
+    #pauseplay {
+      font-size: 5vw;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -33,22 +37,53 @@
   <div>
     <h1 id="track"></h1>
     <h2 id="artist"></h2>
+    <p id="pauseplay"></p>
   </div>
   
   <script>
     var track = document.getElementById("track");
     var artist = document.getElementById("artist");
+    var pauseplay = document.getElementById("pauseplay");
     var img = document.getElementById("image");
 
     var ws = new WebSocket((location.protocol === "https" ? "wss://" : "ws://") + location.host);
 
-    ws.onmessage = function (e) {
-      var data = JSON.parse(e.data);
+    var playing;
 
+    ws.onmessage = function (e) {
+      var data = {};
+
+      try {
+        data = JSON.parse(e.data);
+      } catch (ev) {
+        console.error('JSON error', e.data);
+      }
+      console.log('data', data);
+
+      switch (data.type) {
+        case 'status':
+          return status(data.data);
+      }
+    };
+
+    pauseplay.onclick = function() {
+      playing = !playing;
+      pauseplay.textContent = playing ? 'Pause' : 'Play';
+
+      var data = JSON.stringify({
+        type: playing ? 'play' : 'pause' 
+      });
+      ws.send(data);
+    };
+
+    function status(data) {
       track.textContent = data.track || '';
       artist.textContent = data.artist || '';
       img.src = data.image || '';
-    };
+
+      playing = data.playing;
+      pauseplay.textContent = playing ? 'Pause' : 'Play';
+    }
   </script>
 </body>
 </html>

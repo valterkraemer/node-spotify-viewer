@@ -11,23 +11,33 @@ var wss = new WebSocketServer({
 
 var PORT = process.env.PORT || 3000;
 
-var latestTrackInfo = '';
+var latestTrackInfo;
 
 wss.on('connection', function connection(ws) {
-
   console.log('connection');
 
-  ws.send(latestTrackInfo);
+  if (latestTrackInfo) {
+    ws.send(latestTrackInfo);
+  }
 
   ws.on('message', function incoming(message) {
-    var data = message.split(':');
-    var key = data[0];
-    var value = data[1];
 
-    switch(key) {
-      case 'post':
-        getTrackInfo(value);
-        break;
+    var data = {};
+
+    try {
+      data = JSON.parse(message);
+    } catch (e) {
+      console.error('JSON error', message);
+    }
+
+    switch(data.type) {
+      case 'status':
+        return setTrackInfo(data)
+        .then(function() {
+          return broadcast(latestTrackInfo);
+        });
+      default:
+        return broadcast(message);
     }
   });
 });
@@ -35,38 +45,55 @@ wss.on('connection', function connection(ws) {
 server.on('request', function(req, res) {
 
   fs.readFile('./index.html', function(error, content) {
-
-    console.log('Request');
+    
     res.writeHead(200, {
       'Content-Type': 'text/html'
     });
     res.end(content, 'utf-8');
-
   });
+
 }).listen(PORT, function () {
   console.log('Listening on ' + server.address().port);
 });
 
-function getTrackInfo(trackId) {
+var trackId = '';
 
-  request({
-    'url': 'https://api.spotify.com/v1/tracks/' + trackId,
-  }, function (err, req, body) {
+function setTrackInfo(data) {
+  return new Promise(function (resolve, reject) {
 
-    if (err) {
-      return console.error('err', err);
+    if (data.trackId === trackId) {
+      latestTrackInfo.playing = data.playing;
+      return resolve();
     }
 
-    var parsedBody = JSON.parse(body);
+    request({
+      'url': 'https://api.spotify.com/v1/tracks/' + data.trackId,
+    }, function (err, req, body) {
+      if (err) {
+        return reject(err);
+      }
 
-    latestTrackInfo = JSON.stringify({
-      artist: parsedBody.artists[0].name,
-      track: parsedBody.name,
-      image: parsedBody.album.images[0].url
-    });
+      var parsedBody = JSON.parse(body);
 
-    wss.clients.forEach(function each(client) {
-      client.send(latestTrackInfo);
+      latestTrackInfo = JSON.stringify({
+        type: 'status',
+        data: {
+          artist: parsedBody.artists[0].name,
+          track: parsedBody.name,
+          image: parsedBody.album.images[0].url,
+          playing: data.playing
+        }
+      });
+
+      return resolve();
     });
   });
+}
+
+function broadcast(string) {
+  wss.clients.forEach(function each(client) {
+    client.send(string);
+  });
+
+  return Promise.resolve();
 }
