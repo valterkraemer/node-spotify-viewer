@@ -1,7 +1,10 @@
 var request = require('request');
 
 var WebSocket = require('ws');
-var ws = new WebSocket('ws://localhost:3000');
+var wsUrl = 'ws://' + (process.argv[2] || 'localhost:3000');
+var ws = new WebSocket(wsUrl);
+
+console.log('Connection to WebSocket at "' + wsUrl + '"');
 
 var headers = {
   'Origin': 'https://open.spotify.com'
@@ -10,7 +13,7 @@ var headers = {
 function getCsrfToken() {
 
   var params = {
-    'url': 'https://asdfasdfas.spotilocal.com:4370/simplecsrf/token.json',
+    'url': 'https://randomtext.spotilocal.com:4370/simplecsrf/token.json',
     'headers': headers,
     'rejectUnauthorized' : false
   };
@@ -49,7 +52,7 @@ function connect(values) {
   var csrf = values[0];
   var oauth = values[1];
 
-  var url = 'https://asdfasdfas.spotilocal.com:4370/remote/status.json' + 
+  var url = 'https://randomtext.spotilocal.com:4370/remote/status.json' + 
   '?oauth=' + oauth + '&csrf=' + csrf +
   '&returnon=play%2Cpause&returnafter=60';
 

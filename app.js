@@ -9,6 +9,8 @@ var wss = new WebSocketServer({
   server: server
 });
 
+var PORT = process.env.PORT || 3000;
+
 var latestTrackInfo = '';
 
 wss.on('connection', function connection(ws) {
@@ -41,7 +43,7 @@ server.on('request', function(req, res) {
     res.end(content, 'utf-8');
 
   });
-}).listen(3000, function () {
+}).listen(PORT, function () {
   console.log('Listening on ' + server.address().port);
 });
 
