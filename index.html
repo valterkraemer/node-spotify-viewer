@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Playing on Spotify</title>
+
+  <style>
+    body, img, div {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      position: absolute;
+      color: white;
+    }
+    img {
+      object-fit: contain;
+    }
+    div {
+      top: 5vh;
+      text-align: center;
+      text-shadow: -2px 0 black, 0 2px black, 2px 0 black, 0 -2px black;
+    }
+    h1 {
+      font-size: 6vw;
+    }
+    h2 {
+      font-size: 5vw;
+    }
+  </style>
+</head>
+<body>
+  <img id="image">
+  <div>
+    <h1 id="track"></h1>
+    <h2 id="artist"></h2>
+  </div>
+  
+  <script>
+    var track = document.getElementById("track");
+    var artist = document.getElementById("artist");
+    var img = document.getElementById("image");
+
+    var ws = new WebSocket((location.protocol === "https" ? "wss://" : "ws://") + location.host);
+
+    ws.onmessage = function (e) {
+      var data = JSON.parse(e.data);
+
+      track.textContent = data.track || '';
+      artist.textContent = data.artist || '';
+      img.src = data.image || '';
+    };
+  </script>
+</body>
+</html>
